@@ -1,39 +1,40 @@
 package com.feamor.testing.server.utils;
 
-import com.feamor.testing.server.utils.BaseConnection;
-import com.feamor.testing.server.utils.DataMessage;
+import io.netty.buffer.ByteBuf;
 import io.netty.channel.socket.SocketChannel;
 
 /**
  * Created by feamor on 08.10.2015.
  */
-public class NettyClient implements BaseConnection {
+public class NettyClient {
 
-    private int id;
-    private int idType;
+    private IdType id;
+    private SocketChannel socket;
 
-    @Override
+    public NettyClient(SocketChannel socketChannel) {
+        this.socket = socketChannel;
+    }
+
     public void sendMessage(DataMessage message) {
-
+        socket.writeAndFlush(message);
     }
 
-    @Override
-    public int getIdType() {
-        return  idType;
-    }
 
-    @Override
-    public int getId() {
+    public IdType getId() {
         return id;
     }
 
-    @Override
-    public void setId(int id) {
+
+    public void setId(IdType id) {
         this.id = id;
     }
 
-    @Override
-    public void setIdType(int type) {
-        this.idType = type;
+
+    public void setId(int id, int type) {
+        if (this.id == null) {
+            this.id = new IdType(id, type);
+        } else {
+            this.id.set(id, type);
+        }
     }
 }

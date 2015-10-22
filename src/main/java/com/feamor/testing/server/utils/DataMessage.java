@@ -6,40 +6,62 @@ import io.netty.buffer.ByteBuf;
  * Created by feamor on 08.10.2015.
  */
 public class DataMessage {
-    private short service;
-    private short action;
-    private Object session;
-    private Object data;
+    private int service;
+    private int action;
+    private String session;
+    private ByteBuf data;
 
-    public short getService() {
+    public int getService() {
         return service;
     }
 
-    public void setService(short service) {
+    public void setService(int service) {
         this.service = service;
     }
 
-    public short getAction() {
+    public int getAction() {
         return action;
     }
 
-    public void setAction(short action) {
+    public void setAction(int action) {
         this.action = action;
     }
 
-    public Object getSession() {
+    public String getSession() {
         return session;
     }
 
-    public void setSession(Object session) {
+    public void setSession(String session) {
         this.session = session;
     }
 
-    public Object getData() {
+    public ByteBuf getData() {
         return data;
     }
 
-    public void setData(Object data) {
+    public void setData(ByteBuf data) {
+        this.data = data;
+    }
+
+    public void retain() {
+        if (data!=null) {
+            data.retain();
+        }
+    }
+
+    public void recycle() {
+        if (data!=null) {
+            data.release();
+        }
+    }
+
+    public DataMessage() {
+        
+    }
+    public DataMessage(int service, int action, String session, ByteBuf data) {
+        this.service = service;
+        this.action = action;
+        this.session = session;
         this.data = data;
     }
 }
