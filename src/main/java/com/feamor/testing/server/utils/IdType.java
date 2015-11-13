@@ -50,6 +50,11 @@ public class IdType implements Serializable {
         return result;
     }
 
+    public boolean falstEquals(IdType IdObject) {
+        boolean result = (id == IdObject.id && type == IdObject.type);
+        return result;
+    }
+
     @Override
     public String toString() {
         return "( "+id+" : "+type+" )";

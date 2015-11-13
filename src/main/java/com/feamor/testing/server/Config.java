@@ -1,40 +1,15 @@
 package com.feamor.testing.server;
 
+import com.feamor.testing.server.initialization.TestInitializer;
 import com.feamor.testing.server.services.*;
-import com.feamor.testing.server.utils.IdType;
-import com.feamor.testing.server.utils.Ids;
-import io.netty.buffer.ByteBuf;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
+import com.feamor.testing.server.initialization.Initializer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.annotation.*;
-import org.springframework.integration.channel.DirectChannel;
-import org.springframework.integration.channel.ExecutorChannel;
 import org.springframework.integration.channel.QueueChannel;
 import org.springframework.integration.config.EnableIntegration;
-import org.springframework.integration.dsl.IntegrationFlow;
-import org.springframework.integration.dsl.IntegrationFlows;
-import org.springframework.integration.dsl.support.Function;
-import org.springframework.integration.endpoint.EventDrivenConsumer;
-import org.springframework.integration.endpoint.PollingConsumer;
-import org.springframework.integration.router.HeaderValueRouter;
-import org.springframework.integration.scheduling.PollerMetadata;
-import org.springframework.messaging.*;
-import org.springframework.messaging.core.DestinationResolutionException;
-import org.springframework.messaging.core.DestinationResolver;
-import org.springframework.messaging.handler.annotation.*;
-import org.springframework.messaging.handler.annotation.Header;
-import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.scheduling.TaskScheduler;
-import org.springframework.scheduling.Trigger;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
-import org.springframework.scheduling.support.PeriodicTrigger;
-
-import java.util.HashMap;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Created by feamor on 08.10.2015.
@@ -145,9 +120,15 @@ public class Config {
         return playersDAO;
     }
 
-//    @Bean
-//    public Messages getMessages() {
-//        Messages messages= new Messages();
-//        return  messages;
-//    }
+    @Bean
+    public  GameResolver getGameResolver() {
+        GameResolver gameResolver = new GameResolver();
+        return  gameResolver;
+    }
+
+    @Bean(name = "TestInitializer")
+    public Initializer getTestInitializer() {
+        Initializer initializer = new TestInitializer();
+        return initializer;
+    }
 }

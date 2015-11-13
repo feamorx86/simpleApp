@@ -62,7 +62,11 @@ public interface Messages {
 //    private ThreadPoolTaskExecutor executor;
 
     @Gateway(requestChannel = Config.Channels.NEW_MESSAGES)
-    public void newMessage(@Header(SERVICE_HEADER)int service, @Header(ACTION_HEADER) int action, @Header(SESSION_HEADER) String session, @Header(ID_HEADER) IdType id, @Payload ByteBuf data);
+    public void newMessage(@Header(value = SERVICE_HEADER, required = true) int service,
+                           @Header(value = ACTION_HEADER, required = true) int action,
+                           @Header(value = SESSION_HEADER, required = false) String session,
+                           @Header(value = ID_HEADER, required = true) IdType id,
+                           @Payload(required = false) ByteBuf data);
 //{
 //        Message<ByteBuf> message =
 //        MessageBuilder.withPayload(data)

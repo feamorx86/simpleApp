@@ -39,6 +39,9 @@ public class ServicesRouter {
             case Ids.Services.CLIENTS:
                 result = clientsChannel;
                 break;
+            case Ids.Services.GAME_RESLOVER:
+                result = gameLogicChannel;
+                break;
             case Ids.Services.GAMES:
                 result = gameLogicChannel;
         }

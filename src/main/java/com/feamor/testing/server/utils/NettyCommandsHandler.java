@@ -1,6 +1,9 @@
 package com.feamor.testing.server.utils;
 
 import com.feamor.testing.server.services.Messages;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import io.netty.buffer.EmptyByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
@@ -18,9 +21,15 @@ public class NettyCommandsHandler extends SimpleChannelInboundHandler<DataMessag
         this.messages = messages;
     }
 
+    public static final ByteBuf nullableByteBuffer = new EmptyByteBuf(ByteBufAllocator.DEFAULT);
+
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, DataMessage message)
             throws Exception {
-        messages.newMessage(message.getService(), message.getAction(), message.getSession(), client.getId(),  message.getData());
+        if (message.getData() == null) {
+            messages.newMessage(message.getService(), message.getAction(), message.getSession(), client.getId(), nullableByteBuffer);
+        } else {
+            messages.newMessage(message.getService(), message.getAction(), message.getSession(), client.getId(), message.getData());
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.feamor.testing.server.services;
 
+import com.feamor.testing.server.utils.UserInfo;
 import org.eclipse.jetty.websocket.common.util.TextUtil;
 import org.springframework.util.StringUtils;
 
@@ -11,45 +12,6 @@ import java.util.Map;
  * Created by user on 21.08.2015.
  */
 public class PlayersDAO {
-
-    public static class UserInfo {
-        public String login;
-        public String password;
-
-        public String firstName;
-        public String secondName;
-        public String iconUri;
-
-        public String email;
-
-        public HashMap<Integer, Object> gameStatistics;
-
-        public int id;
-
-        public UserInfo(String login, String password) {
-            this.login = login;
-            this.password = password;
-        }
-    }
-
-    public static class GameCategory {
-        public int id;
-        public String name;
-        public String descriptino;
-    }
-
-    public static class GameDescription{
-        public int id;
-        public String alias;
-
-        public String name;
-        public String description;
-        public String iconUri;
-
-        public ArrayList<Integer> gameCategories;
-
-    }
-
 
     private HashMap<String, UserInfo> users = new HashMap<String, UserInfo>();
 
@@ -64,11 +26,26 @@ public class PlayersDAO {
                     result = UserManager.Results.REGISTER_SUCH_USER_EXIST;
                 } else {
                     UserInfo info = new UserInfo(login, password);
-                    info.firstName = "test_first_name";
-                    info.secondName = "test_second_name";
+                    info.firstName = "login";
+                    info.secondName = "";
                     info.iconUri = "";
                     users.put(loLogin, info);
                     result = UserManager.Results.SUCCESS;
+                }
+            }
+        }
+        return result;
+    }
+
+    public boolean changeUserInfo(UserInfo newUserInfo) {
+        boolean result = false;
+        if (newUserInfo!=null) {
+            String id = newUserInfo.login;
+            if (!StringUtils.isEmpty(id)) {
+                id = id.toLowerCase();
+                if (users.get(id) != null) {
+                    users.put(id, newUserInfo);
+                    result = true;
                 }
             }
         }

@@ -1,10 +1,11 @@
 package com.feamor.testing.server.services;
 
 import com.feamor.testing.server.Config;
-import com.feamor.testing.server.utils.DataMessage;
+import com.feamor.testing.server.games.GamePlayer;
 import com.feamor.testing.server.utils.DataUtils;
 import com.feamor.testing.server.utils.IdType;
 import com.feamor.testing.server.utils.Ids;
+import com.feamor.testing.server.utils.UserInfo;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import org.json.JSONException;
@@ -104,13 +105,19 @@ public class UsersController {
             String id = json.optString("id", null);
             String password = json.optString("password", null);
             String other = json.optString("other", null);
-            Map.Entry<Integer, PlayersDAO.UserInfo> result = userManager.loginUser(type, id, password, other);
+            Map.Entry<Integer, UserInfo> result = userManager.loginUser(type, id, password, other);
+            String session = null;
+            ByteBuf replyData = null;
             if (result.getKey() == UserManager.Results.SUCCESS) {
-
-            } else {
-               // String session =
+                GamePlayer player = userManager.createGamePlayer(result.getValue(), connectionId);
+                if (player!=null) {
+                    replyData = ByteBufAllocator.DEFAULT.ioBuffer();
+                    session = player.getSession();
+                    replyData.writeInt(UserManager.Results.SUCCESS);
+                    replyData.writeInt(player.getId().getId());
+                }
             }
-            //userManager.
+            userManager.sendMessage(connectionId, Ids.Services.CLIENTS, Ids.Actions.Clients.LOGIN, session, replyData);
         }
     }
 }
