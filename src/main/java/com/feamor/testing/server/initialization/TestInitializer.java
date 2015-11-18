@@ -58,6 +58,7 @@ public class TestInitializer extends Initializer {
         description.gameCategories.add(1);
         description.id = 10;
         description.name = "Simple test game";
+        description.iconUri = "https://lh4.ggpht.com/wKrDLLmmxjfRG2-E-k5L5BUuHWpCOe4lWRF7oVs1Gzdn5e5yvr8fj-ORTlBF43U47yI=w300";
         gameResolver.addGameDescription(description);
 
         description = new GameResolver.GameDescription();
@@ -66,6 +67,7 @@ public class TestInitializer extends Initializer {
         description.gameCategories.add(1);
         description.gameCategories.add(10);
         description.id = 11;
+        description.iconUri = "http://www.felixsupplies.ae/wp-content/uploads/icon_chat.png";
         description.name = "Simple Chat";
         gameResolver.addGameDescription(description);
     }

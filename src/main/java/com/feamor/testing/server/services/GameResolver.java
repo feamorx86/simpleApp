@@ -189,6 +189,6 @@ public class GameResolver {
         ByteBuf reply = ByteBufAllocator.DEFAULT.ioBuffer();
         reply.writeInt(gameId);
         player.setSession(userManager.generateSession(player));
-        messages.send(player.getId(), Ids.Services.GAME_RESLOVER, Ids.Actions.GameResolver.GAME_STARTED, player.getSession(), reply);
+        messages.send(player.getId(), Ids.Services.GAMES, Ids.Actions.GameResolver.GAME_STARTED, player.getSession(), reply);
     }
 }
