@@ -1,5 +1,6 @@
 package com.feamor.testing.server.services;
 
+import com.feamor.testing.Application;
 import com.feamor.testing.server.Config;
 import com.feamor.testing.server.games.GamePlayer;
 import com.feamor.testing.server.utils.DataMessage;
@@ -7,7 +8,9 @@ import com.feamor.testing.server.utils.IdType;
 import com.feamor.testing.server.utils.NettyClient;
 import com.feamor.testing.server.utils.UserInfo;
 import io.netty.buffer.ByteBuf;
+import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Scope;
 import org.springframework.integration.annotation.MessageEndpoint;
 import org.springframework.integration.annotation.Poller;
 import org.springframework.integration.annotation.ServiceActivator;
@@ -24,8 +27,10 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Created by feamor on 08.10.2015.
  */
-@MessageEndpoint
+@Scope(value = "singleton")
 public class UserManager {
+
+    private static final Logger log = Logger.getLogger(UserManager.class);
 
     public static class Authorizations {
         public static final int BY_LOGIN_AND_PASSWORD = 10;
@@ -52,60 +57,58 @@ public class UserManager {
         public static final long NEW_CONNECTION = 10 * 1000;
     }
 
-    private HashMap<Integer, QueueObject> newConnections = new HashMap<>();
-    private AtomicInteger idGenerator = new AtomicInteger();
-    private Object newConnectionsLocker = new Object();
+    private HashMap<Integer, QueueObject> newConnections;
+    private AtomicInteger idGenerator;
 
-    private HashMap<Integer, GamePlayer> onlinePlayers = new HashMap<>();
-    private Object onlinePlayersLocker = new Object();
+    private HashMap<Integer, GamePlayer> onlinePlayers;
 
-    private AtomicLong sessionIdGenerator = new AtomicLong();
-    private Random sessionRandom = new Random();
+    private AtomicLong sessionIdGenerator;
+    private Random sessionRandom;
+    private Object connectionsLocker;
 
     @Autowired
     private PlayersDAO playersDAO;
 
-    @ServiceActivator(inputChannel = Config.Channels.SEND_MESSAGES, poller = @Poller(fixedRate = "300", taskExecutor = Config.Executors.UTILITY, maxMessagesPerPoll = "100"))
-    public void sendMessage(@Header(Messages.ID_HEADER) IdType id,
-                            @Header(Messages.SERVICE_HEADER)int service,
-                            @Header(Messages.ACTION_HEADER) int action,
-                            @Header(value = Messages.SESSION_HEADER, required = false) String session,
-                            @Payload(required = false) ByteBuf data) {
+    public UserManager() {
+        newConnections = new HashMap<>();
+        idGenerator = new AtomicInteger();
+        onlinePlayers = new HashMap<>();
+        connectionsLocker = new Object();
+        sessionIdGenerator = new AtomicLong();
+        sessionRandom = new Random();
+    }
+
+    public NettyClient getConnectionForId(IdType id){
+        NettyClient connection = null;
         if (id != null) {
-            NettyClient connection = null;
-            switch (id.getType())
-            {
-                case Queues.NEW_CONNECTIONS:{
-                    QueueObject queueObject = newConnections.get(id.getId());
-                    if (queueObject != null) {
-                        connection = queueObject.client;
+            switch (id.getType()) {
+                case Queues.NEW_CONNECTIONS: {
+                    synchronized (connectionsLocker) {
+                        QueueObject queueObject = newConnections.get(id.getId());
+                        if (queueObject != null) {
+                            connection = queueObject.client;
+                        }
                     }
                 }
                 break;
                 case Queues.ONLINE_PLAYERS: {
-                    GamePlayer player = onlinePlayers.get(id.getId());
-                    if (player!=null) {
-                        connection = player.getConnection();
+                    synchronized (connectionsLocker) {
+                        GamePlayer player = onlinePlayers.get(id.getId());
+                        if (player != null) {
+                            connection = player.getConnection();
+                        }
                     }
                 }
                 break;
             }
-
-            if (connection!=null) {
-                DataMessage message = new DataMessage(service, action, session, data);
-                message.retain();
-                connection.sendMessage(message);
-            } else {
-                //TODO: log error
-            }
-
         } else {
-            //TODO: log error
+            log.error("id is null");
         }
+        return connection;
     }
 
     public void addNewConnection(NettyClient client) {
-        synchronized (newConnectionsLocker) {
+        synchronized (connectionsLocker) {
             int id = idGenerator.incrementAndGet();
             newConnections.put(id, new QueueObject(id, Timeouts.NEW_CONNECTION, client));
             client.setId(id, Queues.NEW_CONNECTIONS);
@@ -145,22 +148,32 @@ public class UserManager {
 
     public GamePlayer createGamePlayer(UserInfo userInfo, IdType id) {
         GamePlayer player = null;
-        if (userInfo != null && id != null && !onlinePlayers.containsKey(id.getId())) {
-            //remove data from NewConnections
-            QueueObject newConnection;
-            newConnection = newConnections.remove(id.getId());
-            if (newConnection !=null) {
-                id.setType(Queues.ONLINE_PLAYERS);
-                player = new GamePlayer();
-                player.setInfo(userInfo);
-                player.setConnection(newConnection.client);
-                player.setSession(generateSession(player));
-                onlinePlayers.put(id.getId(), player);
-            } else {
-                //TODO: Log error
-            }
+
+        if (userInfo == null || id == null) {
+            log.error("CreateGamePlayer : id  or userInfo is null");
         } else {
-            //TODO: log error
+            if (id.getType() == Queues.NEW_CONNECTIONS) {
+                QueueObject newConnection;
+                synchronized (connectionsLocker) {
+                    if (!onlinePlayers.containsKey(id.getId())) {
+                        newConnection = newConnections.remove(id.getId());
+                        if (newConnection != null) {
+                            id.setType(Queues.ONLINE_PLAYERS);
+                            player = new GamePlayer();
+                            player.setInfo(userInfo);
+                            player.setConnection(newConnection.client);
+                            player.setSession(generateSession(player));
+                            onlinePlayers.put(id.getId(), player);
+                        } else {
+                            log.error("There is no player in newConnections and onlinePlayers, id : " + id + ", userInfo : " + userInfo);
+                        }
+                    } else {
+                        log.error("Player already online, player-resume-connection now is not supported! id : " + id + ", userInfo : " + userInfo);
+                    }
+                }
+            } else {
+                log.error("Player stete is - ONLINE player-resume-connection now is not supported! id : " + id + ", userInfo : " + userInfo);
+            }
         }
         return player;
     }

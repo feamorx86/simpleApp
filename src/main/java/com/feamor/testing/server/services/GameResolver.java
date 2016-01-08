@@ -10,6 +10,7 @@ import io.netty.buffer.ByteBufAllocator;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.SchedulingTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 import java.util.ArrayList;
@@ -53,10 +54,10 @@ public class GameResolver {
 
 
     @Autowired
-    @Qualifier(Config.Executors.UTILITY)
-    private ThreadPoolTaskExecutor utilityExecutor;
+    @Qualifier(Config.Executors.TASKS)
+    private SchedulingTaskExecutor taskExecutor;
 
-    private HashMap<Integer, ActiveGame> activeGames;
+    private HashMap<Integer, ActiveGame> activeGames = new HashMap<>();
     private AtomicInteger gameIdGenerator = new AtomicInteger();
 
     private HashMap<Integer, GameCategory> gameCatogories = new HashMap<>();
@@ -82,6 +83,10 @@ public class GameResolver {
         return  result;
     }
 
+    public ActiveGame getActiveGame(int id) {
+        return  activeGames.get(id);
+    }
+
     public GameCreator getOrCreateGameCreator(String alias) {
         GameCreator result = null;
         synchronized (creators) {
@@ -105,7 +110,7 @@ public class GameResolver {
     }
 
     public void prepareGame(ActiveGame game, GameCreator creator) {
-        utilityExecutor.submit(new RunnableWithParams<HashMap.Entry<ActiveGame, GameCreator>>(new HashMap.SimpleEntry<ActiveGame, GameCreator>(game, creator)) {
+        taskExecutor.execute(new RunnableWithParams<HashMap.Entry<ActiveGame, GameCreator>>(new HashMap.SimpleEntry<ActiveGame, GameCreator>(game, creator)) {
             @Override
             public void run() {
                 ActiveGame gameToPrepare = param.getKey();
@@ -117,9 +122,23 @@ public class GameResolver {
                     int id = gameIdGenerator.incrementAndGet();
                     gameToPrepare.startGame(id);
                     if (!gameToPrepare.isError()) {
-                        activeGames.put(id, gameToPrepare);
+                        synchronized (activeGames) {
+                            activeGames.put(id, gameToPrepare);
+                        }
                     }
                     callback.onGameStarted(gameToPrepare);
+                }
+            }
+        });
+    }
+
+    public void finishGame(ActiveGame game) {
+        taskExecutor.execute(new RunnableWithParams<ActiveGame>(game) {
+            @Override
+            public void run() {
+                param.endGame();
+                synchronized (activeGames) {
+                    activeGames.remove(param.getId());
                 }
             }
         });
@@ -189,6 +208,6 @@ public class GameResolver {
         ByteBuf reply = ByteBufAllocator.DEFAULT.ioBuffer();
         reply.writeInt(gameId);
         player.setSession(userManager.generateSession(player));
-        messages.send(player.getId(), Ids.Services.GAMES, Ids.Actions.GameResolver.GAME_STARTED, player.getSession(), reply);
+        messages.send(player.getId(), Ids.Services.GAME_RESLOVER, Ids.Actions.GameResolver.GAME_STARTED, player.getSession(), reply);
     }
 }

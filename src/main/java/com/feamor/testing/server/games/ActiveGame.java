@@ -1,6 +1,13 @@
 package com.feamor.testing.server.games;
 
+import com.feamor.testing.server.services.GameResolver;
+import com.feamor.testing.server.services.Messages;
+import com.feamor.testing.server.utils.DataUtils;
+import com.feamor.testing.server.utils.IdType;
+import com.feamor.testing.server.utils.Ids;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.HashMap;
 
@@ -21,14 +28,25 @@ public abstract class ActiveGame{
         public static final int ERROR = -1;
     }
 
-    protected HashMap<Integer, GamePlayer> users;
+    public interface GamePlayerAccessor {
+        GamePlayer getGamePlayer();
+    }
+
+    protected HashMap<Integer, GamePlayerAccessor> users;
     protected int id;
     protected int state;
+
+    @Autowired
+    protected Messages messages;
+
+    @Autowired
+    protected GameResolver gameResolver;
+
 
     public ActiveGame()
     {
         state = GameStates.NONE;
-        users = new HashMap<Integer, GamePlayer>();
+        users = new HashMap<Integer, GamePlayerAccessor>();
     }
 
     public void initialize(GameCreator creator) {
@@ -53,17 +71,29 @@ public abstract class ActiveGame{
 
     protected abstract void onCreate(GameCreator creator);
     protected abstract void onStarted();
-    protected abstract void onMessage(int action, GamePlayer player, ByteBuf data);
-    protected abstract void onNewPlayer(GamePlayer player, int playerId);
+    protected abstract void onMessage(int action, GamePlayerAccessor player, ByteBuf data);
+    protected abstract void onNewPlayer(GamePlayerAccessor player);
     protected abstract void onGameFinished();
 
     public void addPlayer(GamePlayer player) {
         int playerId = player.getId().getId();
-        users.put(playerId, player);
-        onNewPlayer(player, playerId);
+        GamePlayerAccessor accessor = createPlayer(player);
+        users.put(playerId, accessor);
+        onNewPlayer(accessor);
     }
 
+    public void handleMessage(int action, GamePlayer gamePlayer, ByteBuf data){
+        onMessage(action, getPlayer(gamePlayer), data);
+    }
+
+    public GamePlayerAccessor getPlayer(GamePlayer gamePlayer) {
+        return users.get(gamePlayer.getId().getId());
+    }
+
+    protected abstract GamePlayerAccessor createPlayer(GamePlayer gamePlayer);
+
     public void startGame(int id){
+        this.id = id;
         state = GameStates.STARTING;
         try {
             onStarted();
@@ -73,6 +103,19 @@ public abstract class ActiveGame{
             ex.printStackTrace();
             state = GameStates.ERROR;
         }
+    }
+
+    public void disconnectUser(GamePlayerAccessor user, int result, int code, Object reason) {
+        ByteBuf reply = ByteBufAllocator.DEFAULT.ioBuffer();
+        reply.writeInt(getId());
+        reply.writeInt(result);
+        reply.writeInt(code);
+        if (reason != null) {
+            DataUtils.writeString(reply, reason.toString());
+        } else {
+            DataUtils.writeString(reply, null);
+        }
+        messages.send(user.getGamePlayer().getId(), Ids.Services.GAMES, Ids.Actions.GameResolver.GAME_FINISHED, user.getGamePlayer().getSession(), reply);
     }
 
     public  void endGame() {

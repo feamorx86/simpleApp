@@ -1,6 +1,7 @@
 package com.feamor.testing.server.utils;
 
 import com.feamor.testing.server.services.GameResolver;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -29,5 +30,24 @@ public class UserInfo {
 
         gameStatistics = new HashMap<>();
         avalableGames = new HashMap<>();
+    }
+
+    public JSONObject getShortAsJson() {
+        JSONObject json = new JSONObject();
+        json.put("firstName", firstName);
+        json.put("secondName", secondName);
+        json.put("icon", iconUri);
+        return  json;
+    }
+
+    @Override
+    public String toString() {
+        return "UserInfo{" +
+                "login='" + login + '\'' +
+                ", firstName='" + firstName + '\'' +
+                ", secondName='" + secondName + '\'' +
+                ", email='" + email + '\'' +
+                ", id=" + id +
+                '}';
     }
 }

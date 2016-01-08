@@ -1,13 +1,12 @@
 package com.feamor.testing.server.services;
 
+import com.feamor.testing.Application;
 import com.feamor.testing.server.Config;
 import com.feamor.testing.server.games.GamePlayer;
-import com.feamor.testing.server.utils.DataUtils;
-import com.feamor.testing.server.utils.IdType;
-import com.feamor.testing.server.utils.Ids;
-import com.feamor.testing.server.utils.UserInfo;
+import com.feamor.testing.server.utils.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
+import org.apache.log4j.Logger;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,13 +25,14 @@ import java.util.Map;
 
 @MessageEndpoint
 public class UsersController {
+    private static final Logger log = Logger.getLogger(UsersController.class);
     @Autowired
     private UserManager userManager;
 
     @Autowired
     private Messages messages;
 
-    @ServiceActivator(poller = @Poller(taskExecutor = Config.Executors.UTILITY, fixedRate = "500", maxMessagesPerPoll = "100"), inputChannel = Config.Channels.CLIENT_MESSAGES)
+    @ServiceActivator(poller = @Poller(taskExecutor = Config.Executors.UTILITY, fixedDelay = "200", maxMessagesPerPoll = "100"), inputChannel = Config.Channels.CLIENT_MESSAGES)
     public void onNewMessage(@Header(name = Messages.SERVICE_HEADER) int service,
                              @Header(name = Messages.ACTION_HEADER)int action,
                              @Header(name = Messages.SESSION_HEADER, required = false)String session,
@@ -48,6 +48,23 @@ public class UsersController {
                 break;
             default:
                 break;
+        }
+    }
+
+    @ServiceActivator(poller = @Poller(taskExecutor = Config.Executors.SENDER, fixedDelay = "200", maxMessagesPerPoll = "100"), inputChannel = Config.Channels.SEND_MESSAGES)
+    public void sendMessage(@Header(Messages.ID_HEADER) IdType id,
+                            @Header(Messages.SERVICE_HEADER)int service,
+                            @Header(Messages.ACTION_HEADER) int action,
+                            @Header(value = Messages.SESSION_HEADER, required = false) String session,
+                            @Payload(required = false) ByteBuf data) {
+
+        NettyClient connection = userManager.getConnectionForId(id);
+        if (connection!=null) {
+            DataMessage message = new DataMessage(service, action, session, data);
+            connection.sendMessage(message);
+            message.retain();
+        } else {
+            log.error("Connection is null");
         }
     }
 
@@ -107,17 +124,18 @@ public class UsersController {
             String other = json.optString("other", null);
             Map.Entry<Integer, UserInfo> result = userManager.loginUser(type, id, password, other);
             String session = null;
-            ByteBuf replyData = null;
+            ByteBuf replyData = ByteBufAllocator.DEFAULT.ioBuffer();
             if (result.getKey() == UserManager.Results.SUCCESS) {
                 GamePlayer player = userManager.createGamePlayer(result.getValue(), connectionId);
                 if (player!=null) {
-                    replyData = ByteBufAllocator.DEFAULT.ioBuffer();
                     session = player.getSession();
                     replyData.writeInt(UserManager.Results.SUCCESS);
                     replyData.writeInt(player.getId().getId());
                 }
+            } else {
+                replyData.writeInt(UserManager.Results.LOGIN_OR_PASSWORD_INVALID);
             }
-            userManager.sendMessage(connectionId, Ids.Services.CLIENTS, Ids.Actions.Clients.LOGIN, session, replyData);
+            messages.send(connectionId, Ids.Services.CLIENTS, Ids.Actions.Clients.LOGIN, session, replyData);
         }
     }
 }

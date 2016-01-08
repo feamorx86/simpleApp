@@ -9,7 +9,12 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.integration.annotation.*;
 import org.springframework.integration.channel.QueueChannel;
 import org.springframework.integration.config.EnableIntegration;
+import org.springframework.scheduling.SchedulingTaskExecutor;
+import org.springframework.scheduling.concurrent.ConcurrentTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 
 /**
  * Created by feamor on 08.10.2015.
@@ -31,33 +36,48 @@ public class Config {
     public static class Executors {
         public static final String MESSAGES = "exe_Messages";
         public static final String UTILITY = "exe_Utility";
+        public static final String SENDER = "send_Executor";
         public static final String GAME_LOGIC = "exe_GameLogic";
+        public static final String TASKS = "task_Executor";
     }
 
-    public static class EndPoints {
-        public static final String SERVICES_ROUTER = "e_Roter";
-        public static final String MESSAGES_SERVICE = "e_Messages";
+    @Bean(name = Executors.SENDER)
+    public SchedulingTaskExecutor getMessagesSender() {
+        Executor executor = java.util.concurrent.Executors.newSingleThreadExecutor();
+        ConcurrentTaskExecutor taskExecutor = new ConcurrentTaskExecutor(executor);
+        return taskExecutor;
     }
 
     @Bean(name = Executors.MESSAGES)
-    public ThreadPoolTaskExecutor getMessagesExecutor() {
+    public SchedulingTaskExecutor getMessagesExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setMaxPoolSize(10);
         executor.setCorePoolSize(5);
         executor.setQueueCapacity(10 * 10000);
-        executor.setKeepAliveSeconds(2000);
+        //executor.setKeepAliveSeconds(2000);
         executor.setThreadGroupName(Executors.MESSAGES);
         return executor;
     }
 
     @Bean(name = Executors.UTILITY)
-    public ThreadPoolTaskExecutor getUtilityExecutor() {
+      public SchedulingTaskExecutor getUtilityExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setMaxPoolSize(10);
         executor.setCorePoolSize(5);
         executor.setQueueCapacity(10 * 10000);
-        executor.setKeepAliveSeconds(2000);
+        //executor.setKeepAliveSeconds(2000);
         executor.setThreadGroupName(Executors.UTILITY);
+        return executor;
+    }
+
+    @Bean(name = Executors.TASKS)
+    public SchedulingTaskExecutor getTaskExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setMaxPoolSize(10);
+        executor.setCorePoolSize(5);
+        executor.setQueueCapacity(10 * 10000);
+//        executor.setKeepAliveSeconds(2000);
+        executor.setThreadGroupName(Executors.TASKS);
         return executor;
     }
 
@@ -67,8 +87,8 @@ public class Config {
         executor.setMaxPoolSize(10);
         executor.setCorePoolSize(5);
         executor.setQueueCapacity(10 * 10000);
-        executor.setKeepAliveSeconds(2000);
-        executor.setThreadGroupName(Executors.UTILITY);
+//        executor.setKeepAliveSeconds(2000);
+        executor.setThreadGroupName(Executors.GAME_LOGIC);
         return executor;
     }
 
@@ -81,24 +101,28 @@ public class Config {
     @Bean(name = Channels.NEW_MESSAGES)
     public QueueChannel getNewMessagesChannel() {
         QueueChannel channel = new QueueChannel(10 * 1000);
+        channel.setLoggingEnabled(false);
         return channel;
     }
 
     @Bean(name = Channels.SEND_MESSAGES)
     public QueueChannel getSendMessagesChannel() {
         QueueChannel channel = new QueueChannel(10 * 1000);
+        channel.setLoggingEnabled(false);
         return channel;
     }
 
     @Bean(name = Channels.CLIENT_MESSAGES)
     public QueueChannel getClientMessagesChannel() {
         QueueChannel channel = new QueueChannel(10 * 1000);
+        channel.setLoggingEnabled(false);
         return channel;
     }
 
     @Bean(name = Channels.GAME_MESSAGES)
     public QueueChannel getGameMessagesChannel() {
         QueueChannel channel = new QueueChannel(100 * 1000);
+        channel.setLoggingEnabled(false);
         return channel;
     }
 

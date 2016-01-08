@@ -19,7 +19,7 @@ public abstract class GameCreator {
     }
 
     public void  initialize(GameResolver resolver) {
-        this.gameResolver = gameResolver;
+        this.gameResolver = resolver;
     }
 
     public abstract ActiveGame createGame();

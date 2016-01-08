@@ -1,9 +1,8 @@
 package com.feamor.testing.server.initialization;
 
-import com.feamor.testing.server.games.ChatGameCreator;
+import com.feamor.testing.server.games.chatgame.ChatGameCreator;
 import com.feamor.testing.server.services.GameResolver;
 import com.feamor.testing.server.services.PlayersDAO;
-import com.feamor.testing.server.services.UserManager;
 import com.feamor.testing.server.utils.UserInfo;
 import org.springframework.beans.factory.annotation.Autowired;
 

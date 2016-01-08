@@ -31,7 +31,7 @@ public class ServicesRouter {
     @Qualifier(Config.Channels.ERRORS)
     private MessageChannel errorsChannel;
 
-    @Router(inputChannel = Config.Channels.NEW_MESSAGES, poller = @Poller(maxMessagesPerPoll = "100", fixedRate = "300", taskExecutor = Config.Executors.MESSAGES))
+    @Router(inputChannel = Config.Channels.NEW_MESSAGES, poller = @Poller(maxMessagesPerPoll = "100", fixedDelay = "200", taskExecutor = Config.Executors.MESSAGES))
     public MessageChannel route(Message<?> message) {
         int service = (Integer)message.getHeaders().get(Messages.SERVICE_HEADER);
         MessageChannel result = errorsChannel ;

@@ -1,25 +1,12 @@
 package com.feamor.testing.server.services;
 
 import com.feamor.testing.server.Config;
-import com.feamor.testing.server.utils.DataMessage;
 import com.feamor.testing.server.utils.IdType;
-import com.feamor.testing.server.utils.Ids;
-import com.feamor.testing.server.utils.RunnableWithParams;
 import io.netty.buffer.ByteBuf;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.integration.annotation.Gateway;
-import org.springframework.integration.annotation.GatewayHeader;
 import org.springframework.integration.annotation.MessagingGateway;
-import org.springframework.integration.channel.QueueChannel;
-import org.springframework.integration.support.MessageBuilder;
-import org.springframework.messaging.Message;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
-
-import java.util.concurrent.Executor;
-import java.util.concurrent.RunnableFuture;
 
 /**
  * Created by feamor on 08.10.2015.
