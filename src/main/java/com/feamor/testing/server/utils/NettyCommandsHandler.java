@@ -26,10 +26,15 @@ public class NettyCommandsHandler extends SimpleChannelInboundHandler<DataMessag
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, DataMessage message)
             throws Exception {
-        if (message.getData() == null) {
-            messages.newMessage(message.getService(), message.getAction(), message.getSession(), client.getId(), nullableByteBuffer);
+        if (message.getAction() == Ids.Actions.HEART_BEAT_ACTION) {
+            client.heartBeat();
+            message.recycle();
         } else {
-            messages.newMessage(message.getService(), message.getAction(), message.getSession(), client.getId(), message.getData());
+            if (message.getData() == null) {
+                messages.newMessage(message.getService(), message.getAction(), message.getSession(), client.getId(), nullableByteBuffer);
+            } else {
+                messages.newMessage(message.getService(), message.getAction(), message.getSession(), client.getId(), message.getData());
+            }
         }
     }
 }

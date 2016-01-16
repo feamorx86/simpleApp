@@ -12,6 +12,7 @@ public class GamePlayer {
     private NettyClient connection;
     private UserInfo info;
     private String session;
+    private long heartBaetTime;
 
     public IdType getId() {
         return connection.getId();

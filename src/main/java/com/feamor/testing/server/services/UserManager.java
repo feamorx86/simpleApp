@@ -10,17 +10,17 @@ import com.feamor.testing.server.utils.UserInfo;
 import io.netty.buffer.ByteBuf;
 import org.apache.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Scope;
 import org.springframework.integration.annotation.MessageEndpoint;
 import org.springframework.integration.annotation.Poller;
 import org.springframework.integration.annotation.ServiceActivator;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
-import java.util.Calendar;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -55,6 +55,8 @@ public class UserManager {
 
     public static class Timeouts{
         public static final long NEW_CONNECTION = 10 * 1000;
+        public static final long CHECK_ONLINE_TIMEOUT = 5 * 1000;
+        public static final long MAX_TIME_WITHOUT_HEARTBEAT = 12 * 1000;
     }
 
     private HashMap<Integer, QueueObject> newConnections;
@@ -66,8 +68,18 @@ public class UserManager {
     private Random sessionRandom;
     private Object connectionsLocker;
 
+    private ScheduledFuture checkOnlinePlayersFuture = null;
+
     @Autowired
     private PlayersDAO playersDAO;
+
+    @Autowired
+    @Qualifier(Config.Executors.GAME_LOGIC_SCHEDULER)
+    private ThreadPoolTaskScheduler scheduler;
+
+    @Autowired
+    private GameResolver gameResolver;
+
 
     public UserManager() {
         newConnections = new HashMap<>();
@@ -76,6 +88,87 @@ public class UserManager {
         connectionsLocker = new Object();
         sessionIdGenerator = new AtomicLong();
         sessionRandom = new Random();
+    }
+
+    private void checkOnlinePlayers() {
+        ArrayList<GamePlayer> disconnectedPlayers = null;
+        ArrayList<QueueObject> disconnectedNewUsers = null;
+        boolean hasPlayers = false;
+        //check online players
+        synchronized (connectionsLocker) {
+
+            long now = Calendar.getInstance().getTimeInMillis();
+            for(GamePlayer player : onlinePlayers.values()) {
+                long delta = now - player.getConnection().getHeartBeat();
+                if (delta > Timeouts.MAX_TIME_WITHOUT_HEARTBEAT) {
+                    if (disconnectedPlayers == null)
+                        disconnectedPlayers = new ArrayList<>();
+                    disconnectedPlayers.add(player);
+                } else {
+                    player.getConnection().sendHeartBeat();
+                }
+            }
+            if (disconnectedPlayers != null) {
+                for(GamePlayer player : disconnectedPlayers) {
+                    onlinePlayers.remove(player.getId().getId());
+                }
+            }
+            if (onlinePlayers.size() > 0) {
+                hasPlayers = true;
+            }
+            for(QueueObject user : newConnections.values()) {
+                long delta = now - user.client.getHeartBeat();
+                if (delta > Timeouts.MAX_TIME_WITHOUT_HEARTBEAT) {
+                    if (disconnectedNewUsers == null)
+                        disconnectedNewUsers = new ArrayList<>();
+                    disconnectedNewUsers.add(user);
+                } else {
+                    user.client.sendHeartBeat();
+                }
+            }
+            if (disconnectedNewUsers != null) {
+                for(QueueObject user : disconnectedNewUsers) {
+                    newConnections.remove(user.id);
+                }
+            }
+            if (newConnections.size() > 0) {
+                hasPlayers = true;
+            }
+        }
+        if (disconnectedPlayers != null) {
+            for(GamePlayer player : disconnectedPlayers) {
+                gameResolver.notifyClientDisconnected(player);
+                player.getConnection().disconnect();
+            }
+        }
+        if (disconnectedNewUsers != null) {
+            for(QueueObject user : disconnectedNewUsers) {
+                user.client.disconnect();
+            }
+        }
+        //TODO: add ability to check new connections
+        //TODO: add ability to store and use last received game message time and disconnect "dead" players.
+        //TODO: add ability to stop checking if no players
+        if (!hasPlayers) {
+            synchronized (connectionsLocker) {
+                checkOnlinePlayersFuture.cancel(false);
+                checkOnlinePlayersFuture = null;
+            }
+        }
+    }
+
+    private void startCheckPlayersOnline() {
+        synchronized (connectionsLocker) {
+            if (checkOnlinePlayersFuture != null) {
+                checkOnlinePlayersFuture.cancel(false);
+            }
+            checkOnlinePlayersFuture = scheduler.scheduleWithFixedDelay(new Runnable() {
+                @Override
+                public void run() {
+                    checkOnlinePlayers();
+                }
+            }, Timeouts.CHECK_ONLINE_TIMEOUT);//TODO: add delay before start
+        }
     }
 
     public NettyClient getConnectionForId(IdType id){
@@ -112,6 +205,9 @@ public class UserManager {
             int id = idGenerator.incrementAndGet();
             newConnections.put(id, new QueueObject(id, Timeouts.NEW_CONNECTION, client));
             client.setId(id, Queues.NEW_CONNECTIONS);
+
+            if (checkOnlinePlayersFuture == null)
+                startCheckPlayersOnline();
         }
     }
 
@@ -163,6 +259,7 @@ public class UserManager {
                             player.setInfo(userInfo);
                             player.setConnection(newConnection.client);
                             player.setSession(generateSession(player));
+                            player.getConnection().heartBeat();
                             onlinePlayers.put(id.getId(), player);
                         } else {
                             log.error("There is no player in newConnections and onlinePlayers, id : " + id + ", userInfo : " + userInfo);
@@ -183,7 +280,9 @@ public class UserManager {
         if (id != null && session != null) {
             switch (id.getType()) {
                 case Queues.ONLINE_PLAYERS:
-                    result = onlinePlayers.get(id.getId());
+                    synchronized (connectionsLocker) {
+                        result = onlinePlayers.get(id.getId());
+                    }
                     if (result != null) {
                         if (!session.equals(result.getSession())) {
                             result = null;

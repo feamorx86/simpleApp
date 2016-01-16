@@ -53,32 +53,34 @@ public class NettyCommandCodec extends ByteToMessageCodec<DataMessage> {
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
-        DataMessage command = new DataMessage();
-        int lenght = in.readInt();
-        int service = in.readInt();
-        int action = in.readInt();
-        int sessionLength = in.readInt();
-        String session = null;
-        if (sessionLength > 0) {
-            byte[] sessionData = new byte[sessionLength];
-            in.readBytes(sessionData, 0, sessionLength);
-            session = new String(sessionData);
-        } else {
-            session = "";
+        if (in.isReadable()) {
+            DataMessage command = new DataMessage();
+            int lenght = in.readInt();
+            int service = in.readInt();
+            int action = in.readInt();
+            int sessionLength = in.readInt();
+            String session = null;
+            if (sessionLength > 0) {
+                byte[] sessionData = new byte[sessionLength];
+                in.readBytes(sessionData, 0, sessionLength);
+                session = new String(sessionData);
+            } else {
+                session = "";
+            }
+            int dataLength = in.readInt();
+            ByteBuf data = null;
+            if (dataLength > 0) {
+                data = allocator.buffer(dataLength, dataLength);
+                in.readBytes(data, dataLength);
+            } else {
+                data = null;
+            }
+            command.setService(service);
+            command.setAction(action);
+            command.setSession(session);
+            command.setData(data);
+            command.retain();
+            out.add(command);
         }
-        int dataLength = in.readInt();
-        ByteBuf data = null;
-        if (dataLength > 0) {
-            data = allocator.buffer(dataLength, dataLength);
-            in.readBytes(data, dataLength);
-        } else {
-            data = null;
-        }
-        command.setService(service);
-        command.setAction(action);
-        command.setSession(session);
-        command.setData(data);
-        command.retain();
-        out.add(command);
     }
 }

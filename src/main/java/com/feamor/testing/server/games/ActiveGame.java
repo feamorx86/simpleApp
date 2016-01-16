@@ -73,12 +73,20 @@ public abstract class ActiveGame{
     protected abstract void onStarted();
     protected abstract void onMessage(int action, GamePlayerAccessor player, ByteBuf data);
     protected abstract void onNewPlayer(GamePlayerAccessor player);
+    public void onPlayerDisconnected(GamePlayerAccessor player) {
+        synchronized (users) {
+            users.remove(player.getGamePlayer().getId().getId());
+        }
+    }
     protected abstract void onGameFinished();
 
     public void addPlayer(GamePlayer player) {
         int playerId = player.getId().getId();
         GamePlayerAccessor accessor = createPlayer(player);
-        users.put(playerId, accessor);
+        synchronized (users)
+        {
+            users.put(playerId, accessor);
+        }
         onNewPlayer(accessor);
     }
 
@@ -87,7 +95,9 @@ public abstract class ActiveGame{
     }
 
     public GamePlayerAccessor getPlayer(GamePlayer gamePlayer) {
-        return users.get(gamePlayer.getId().getId());
+        synchronized (users) {
+            return users.get(gamePlayer.getId().getId());
+        }
     }
 
     protected abstract GamePlayerAccessor createPlayer(GamePlayer gamePlayer);
@@ -128,7 +138,9 @@ public abstract class ActiveGame{
             ex.printStackTrace();
             state = GameStates.ERROR;
         }
-        users.clear();
+        synchronized (users) {
+            users.clear();
+        }
     }
 
     public boolean isStarted() {

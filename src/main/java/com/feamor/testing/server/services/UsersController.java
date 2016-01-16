@@ -62,7 +62,6 @@ public class UsersController {
         if (connection!=null) {
             DataMessage message = new DataMessage(service, action, session, data);
             connection.sendMessage(message);
-            message.retain();
         } else {
             log.error("Connection is null");
         }

@@ -23,7 +23,12 @@ public class Ids {
     }
 
 
+
+
     public static class Actions {
+
+        public static final int HEART_BEAT_ACTION = -1;
+
         public static class Clients {
             public static final int REGISTER_NEW = 100;
             public static final int LOGIN = 200;

@@ -1,21 +1,22 @@
 package com.feamor.testing.server.games.chatgame;
 
+import com.feamor.testing.server.Config;
 import com.feamor.testing.server.games.ActiveGame;
 import com.feamor.testing.server.games.GameCreator;
 import com.feamor.testing.server.games.GamePlayer;
-import com.feamor.testing.server.utils.DataUtils;
-import com.feamor.testing.server.utils.IdType;
-import com.feamor.testing.server.utils.Ids;
-import com.feamor.testing.server.utils.JSONBuilder;
+import com.feamor.testing.server.utils.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import org.apache.log4j.Logger;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Map;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by feamor on 15.12.2015.
@@ -37,6 +38,12 @@ public class SimpleChatController extends ActiveGame {
     @Override
     protected void onCreate(GameCreator creator) {
 
+    }
+
+    @Override
+    public void onPlayerDisconnected(GamePlayerAccessor player) {
+        super.onPlayerDisconnected(player);
+        userExits(player);
     }
 
     @Override
@@ -98,7 +105,10 @@ public class SimpleChatController extends ActiveGame {
     }
 
     private void sendUserInfo(GamePlayerAccessor player, int requestedUserId, int callback) {
-        GamePlayerAccessor accessor = users.get(requestedUserId);
+        GamePlayerAccessor accessor = null;
+        synchronized (users) {
+            accessor = users.get(requestedUserId);
+        }
         ByteBuf reply = ByteBufAllocator.DEFAULT.ioBuffer();
         reply.writeInt(callback);
         if (accessor != null) {
@@ -118,9 +128,11 @@ public class SimpleChatController extends ActiveGame {
         reply.writeInt(callback);
         JSONObject json = new JSONObject();
         JSONArray usersList = new JSONArray();
-        for(GamePlayerAccessor accessor : this.users.values()){
-            if (accessor != player) {
-                usersList.put(((ChatPlayer) accessor).getShortInfo());
+        synchronized (users) {
+            for (GamePlayerAccessor accessor : users.values()) {
+                if (accessor != player) {
+                    usersList.put(((ChatPlayer) accessor).getShortInfo());
+                }
             }
         }
         json.put("users", usersList);
@@ -128,10 +140,10 @@ public class SimpleChatController extends ActiveGame {
         messages.send(player.getGamePlayer().getId(), Ids.Services.GAMES, Ids.Actions.GameLogic.SimpleChat.LIST_USERS, player.getGamePlayer().getSession(), reply);
     }
 
-    private void userExits(ChatPlayer player) {
+    private void userExits(GamePlayerAccessor player) {
         ByteBuf reply = ByteBufAllocator.DEFAULT.ioBuffer();
-        reply.writeInt(player.getId());
-        notifyAll(player.getGamePlayer().getId(), Ids.Actions.GameLogic.SimpleChat.USER_EXIT, reply);
+        reply.writeInt(player.getGamePlayer().getId().getId());
+        notifyAll(Ids.Actions.GameLogic.SimpleChat.USER_EXIT, reply);
     }
 
     private void userEntered(ChatPlayer player) {
@@ -139,11 +151,14 @@ public class SimpleChatController extends ActiveGame {
         ByteBuf reply = ByteBufAllocator.DEFAULT.ioBuffer();
         JSONObject json = player.getShortInfo();
         DataUtils.writeString(reply, json.toString());
-        notifyAll(player.getGamePlayer().getId(), Ids.Actions.GameLogic.SimpleChat.NEW_USER, reply);
+        notifyAll(Ids.Actions.GameLogic.SimpleChat.NEW_USER, reply);
     }
 
     private void sendMessages(ChatPlayer player, int receiverId, String message, int callback) {
-        ChatPlayer sendTo = (ChatPlayer) users.get(receiverId);
+        ChatPlayer sendTo = null;
+        synchronized (users) {
+            sendTo = (ChatPlayer) users.get(receiverId);
+        }
         if (sendTo != null) {
             ByteBuf reply = ByteBufAllocator.DEFAULT.ioBuffer();
             reply.writeInt(player.getId());
@@ -164,25 +179,32 @@ public class SimpleChatController extends ActiveGame {
     }
 
     private void notifyAll(int action, ByteBuf data, int exceptPlayer) {
-        for(GamePlayerAccessor p : users.values()) {
-            ChatPlayer player = (ChatPlayer)p;
-            if (player.getId() != exceptPlayer) {
-                messages.send(player.getGamePlayer().getId(), Ids.Services.GAMES, action, player.getGamePlayer().getSession(), data.copy());
+        synchronized (users) {
+            for (GamePlayerAccessor p : users.values()) {
+                ChatPlayer player = (ChatPlayer) p;
+                if (player.getId() != exceptPlayer) {
+                    messages.send(player.getGamePlayer().getId(), Ids.Services.GAMES, action, player.getGamePlayer().getSession(), data.copy());
+                }
+                data.release();
             }
-            data.retain();
         }
     }
 
-    private void notifyAll(IdType andId, int action, ByteBuf data) {
-        for(GamePlayerAccessor p : users.values()) {
-            ChatPlayer player = (ChatPlayer)p;
-            messages.send(player.getGamePlayer().getId(), Ids.Services.GAMES, action, player.getGamePlayer().getSession(), data.copy());
+    private void notifyAll(int action, ByteBuf data) {
+        synchronized (users) {
+            for (GamePlayerAccessor p : users.values()) {
+                ChatPlayer player = (ChatPlayer) p;
+                messages.send(player.getGamePlayer().getId(), Ids.Services.GAMES, action, player.getGamePlayer().getSession(), data.copy());
+            }
         }
-        data.retain();
+        data.release();
     }
 
     @Override
     protected void onGameFinished() {
+//        if (updateUsersTaskFuture != null && !updateUsersTaskFuture.isCancelled()) {
+//            updateUsersTaskFuture.cancel(false);
+//        }
         synchronized (users) {
             for (GamePlayerAccessor p : users.values()) {
                 disconnectUser(p, Results.END_GAME, Results.END_GAME, null);

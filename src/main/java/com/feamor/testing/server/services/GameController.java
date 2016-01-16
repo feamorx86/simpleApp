@@ -53,7 +53,6 @@ public class GameController {
                     ActiveGame game = gameResolver.getActiveGame(gameId);
                     if (game != null) {
                         try {
-
                             game.handleMessage(action, player, data);
                         } catch(Exception ex) {
                             log.error("Handle game message error : ", ex);
@@ -109,6 +108,10 @@ public class GameController {
                     }
                     break;
             }
+        }
+
+        if (data != null) { //TODO: проверить действительно ли можно освобождать тут сообщение? и добавить освобожнение туда где оно требуется!
+            data.release();
         }
     }
 

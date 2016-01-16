@@ -109,6 +109,32 @@ public class GameResolver {
         return  result;
     }
 
+    private static class DisconnectedPair {
+        public ActiveGame.GamePlayerAccessor player;
+        public ActiveGame game;
+
+        public DisconnectedPair(ActiveGame.GamePlayerAccessor player, ActiveGame game) {
+            this.player = player;
+            this.game = game;
+        }
+    }
+
+    public void notifyClientDisconnected(GamePlayer player) {
+        synchronized (activeGames) {
+            for(ActiveGame game : activeGames.values()) {
+                ActiveGame.GamePlayerAccessor accessor = game.getPlayer(player);
+                if (accessor != null) {
+                    taskExecutor.execute(new RunnableWithParams<DisconnectedPair>(new DisconnectedPair(accessor, game)) {
+                        @Override
+                        public void run() {
+                            param.game.onPlayerDisconnected(param.player);
+                        }
+                    });
+                }
+            }
+        }
+    }
+
     public void prepareGame(ActiveGame game, GameCreator creator) {
         taskExecutor.execute(new RunnableWithParams<HashMap.Entry<ActiveGame, GameCreator>>(new HashMap.SimpleEntry<ActiveGame, GameCreator>(game, creator)) {
             @Override

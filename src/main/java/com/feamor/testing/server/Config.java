@@ -12,6 +12,7 @@ import org.springframework.integration.config.EnableIntegration;
 import org.springframework.scheduling.SchedulingTaskExecutor;
 import org.springframework.scheduling.concurrent.ConcurrentTaskExecutor;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -38,6 +39,7 @@ public class Config {
         public static final String UTILITY = "exe_Utility";
         public static final String SENDER = "send_Executor";
         public static final String GAME_LOGIC = "exe_GameLogic";
+        public static final String GAME_LOGIC_SCHEDULER = "scheduler_Logic";
         public static final String TASKS = "task_Executor";
     }
 
@@ -79,6 +81,13 @@ public class Config {
 //        executor.setKeepAliveSeconds(2000);
         executor.setThreadGroupName(Executors.TASKS);
         return executor;
+    }
+
+    @Bean(name = Executors.GAME_LOGIC_SCHEDULER)
+    public ThreadPoolTaskScheduler getGameLogicScheduler() {
+        ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
+        taskScheduler.setPoolSize(7);
+        return taskScheduler;
     }
 
     @Bean(name = Executors.GAME_LOGIC)
